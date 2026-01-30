@@ -1,0 +1,67 @@
+name: Deploy Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        type: choice
+        options: [dev, test, prod]
+        default: dev
+      aws_region:
+        description: "AWS Region (e.g., us-east-2)"
+        required: true
+        default: "ap-south-1"
+        type: choice
+        options: [ap-south-1]
+       
+
+env:
+  environment: ${{ github.event.inputs.environment }}
+  aws_region: ${{ github.event.inputs.aws_region }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      issues: write
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+          aws-region: ${{ github.event.inputs.aws_region }}
+
+      - run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_S3_BACKEND_BUCKET_NAME }}" \
+            -backend-config="key=state/github-oidc/${{ github.event.inputs.environment }}/terraform.tfstate" \
+            -backend-config="region=${{ github.event.inputs.aws_region }}" \
+
+      - run: terraform validate
+
+      - run: terraform plan \
+          -var-file=./stage_variables/${{ github.event.inputs.environment }}/${{ github.event.inputs.aws_region }}.tfvars \
+          -var="aws_region=${{ github.event.inputs.aws_region }}" \
+          -var="environment=${{ github.event.inputs.environment }}" \
+          -out=tfplan
+
+      - uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.MY_GITHUB_TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+          issue-title: "Deploying to ${{ github.event.inputs.environment }} environment"
+          issue-body: "Please review the Terraform plan and approve this deployment to ${{ github.event.inputs.environment }}."
+
+      - run: terraform apply tfplan
