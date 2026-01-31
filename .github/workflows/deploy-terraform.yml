@@ -50,11 +50,12 @@ jobs:
 
       - run: terraform validate
 
-      - run: terraform plan \
-          -var-file=./stage_variables/${{ github.event.inputs.environment }}/${{ github.event.inputs.aws_region }}.tfvars \
-          -var="aws_region=${{ github.event.inputs.aws_region }}" \
-          -var="environment=${{ github.event.inputs.environment }}" \
-          -out=tfplan
+      - run: |
+          terraform plan \
+            -var-file=./stage_variables/${{ github.event.inputs.environment }}/${{ github.event.inputs.aws_region }}.tfvars \
+            -var="aws_region=${{ github.event.inputs.aws_region }}" \
+            -var="environment=${{ github.event.inputs.environment }}" \
+            -out=tfplan
 
       - uses: trstringer/manual-approval@v1
         with:
