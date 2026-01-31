@@ -4,7 +4,7 @@ provider "aws" {
   default_tags {
     tags = {
       environment = var.environment,
-      project     = "aws-github-oidc-setup"
+      project     = "github-oidc-setup"
     }
   }
 }
